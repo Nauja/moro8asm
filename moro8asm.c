@@ -522,6 +522,12 @@ moro8asm_token* moro8asm_tokenize(const char* buf, size_t size)
         case ',':
             MORO8ASM_SINGLECHAR_TOKEN(MORO8ASM_TOK_COMMA)
             break;
+        case '*':
+            MORO8ASM_SINGLECHAR_TOKEN(MORO8ASM_TOK_STAR)
+            break;
+        case '=':
+            MORO8ASM_SINGLECHAR_TOKEN(MORO8ASM_TOK_EQUAL)
+            break;
         default:
             // Enter label or number mode
             if (MORO8ASM_IS_LETTER(c))
@@ -899,7 +905,8 @@ moro8asm_program* moro8asm_parse(const moro8asm_token* token)
     }
 
     // Program counter
-    moro8_udword pc = 0x600;
+    moro8_udword pc = MORO8_ROM_OFFSET;
+    moro8_udword offset = 0;
 
     moro8asm_instruction* data = program->lines;
     const moro8asm_token* next = token;
@@ -910,6 +917,27 @@ moro8asm_program* moro8asm_parse(const moro8asm_token* token)
             break;
         }
 
+        // Parse * = $FFFF
+        if (next->tok == MORO8ASM_TOK_STAR)
+        {
+            next = next->next;
+            if (!next || next->tok != MORO8ASM_TOK_EQUAL)
+            {
+                printf("Missing = after *");
+                break;
+            }
+
+            next = next->next;
+            if (!next || (next->tok != MORO8ASM_TOK_WORD && next->tok != MORO8ASM_TOK_DWORD))
+            {
+                printf("Expected number after * =");
+                break;
+            }
+
+            pc = next->data.number;
+            next = next->next;
+        }
+
         // Push a new instruction
         data->next = moro8asm_instruction_create();
         program->num_lines++;
@@ -917,7 +945,7 @@ moro8asm_program* moro8asm_parse(const moro8asm_token* token)
 
         // Set line informations
         data->pc = pc;
-        data->offset = pc - 0x600;
+        data->offset = offset;
         data->line = next->line;
 
         // There is a label on this line
@@ -951,8 +979,10 @@ moro8asm_program* moro8asm_parse(const moro8asm_token* token)
             break;
         }
         pc += data->size;
-        program->size += data->size;
+        offset += data->size;
     }
+
+    program->size = offset;
 
     // Delete the first placeholder instruction
     data = program->lines->next;
