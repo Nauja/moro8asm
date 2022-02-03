@@ -80,9 +80,9 @@ ExternalProject_Add(moro8
 add_library(moro8_vendor STATIC SHARED IMPORTED)
 
 if(MSVC)
-  set(MORO8_LIBRARY "${MORO8_BINARY_DIR}/${CMAKE_CFG_INTDIR}/libmoro8.lib")
+  set(MORO8_LIBRARY "${MORO8_BINARY_DIR}/${CMAKE_CFG_INTDIR}/moro8.lib")
 else()
-  set(MORO8_LIBRARY "${MORO8_BINARY_DIR}/libmoro8.a")
+  set(MORO8_LIBRARY "${MORO8_BINARY_DIR}/moro8.a")
 endif()
 
 add_dependencies(moro8_vendor moro8)

@@ -2,7 +2,7 @@
 ; by PJP
 
 start:
- lda #$15
+ lda #$0F
  sta $0 ;xpos
  sta $1 ;ypos
 

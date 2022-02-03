@@ -135,6 +135,248 @@ struct moro8asm_hooks {
  */
 MORO8ASM_PUBLIC(void) moro8asm_init_hooks(struct moro8asm_hooks *hooks);
 
+/** Enum for parser tokens. */
+enum moro8asm_tok
+{
+    MORO8ASM_TOK_END,
+    MORO8ASM_TOK_LABEL,
+    MORO8ASM_TOK_OPCODE,
+    MORO8ASM_TOK_WORD,
+    MORO8ASM_TOK_DWORD,
+    MORO8ASM_TOK_X,
+    MORO8ASM_TOK_Y,
+    MORO8ASM_TOK_COLON,
+    MORO8ASM_TOK_LPAREN,
+    MORO8ASM_TOK_RPAREN,
+    MORO8ASM_TOK_COMMA,
+    MORO8ASM_TOK_HASH,
+};
+
+/** Enum for opcodes. */
+enum moro8asm_op
+{
+    MORO8ASM_OP_ADC,
+    MORO8ASM_OP_AND,
+    MORO8ASM_OP_ASL,
+    MORO8ASM_OP_BCC,
+    MORO8ASM_OP_BCS,
+    MORO8ASM_OP_BEQ,
+    MORO8ASM_OP_BIT,
+    MORO8ASM_OP_BMI,
+    MORO8ASM_OP_BNE,
+    MORO8ASM_OP_BPL,
+    MORO8ASM_OP_BVC,
+    MORO8ASM_OP_BVS,
+    MORO8ASM_OP_CLC,
+    MORO8ASM_OP_CLV,
+    MORO8ASM_OP_CMP,
+    MORO8ASM_OP_CPX,
+    MORO8ASM_OP_CPY,
+    MORO8ASM_OP_DEA,
+    MORO8ASM_OP_DEC,
+    MORO8ASM_OP_DEX,
+    MORO8ASM_OP_DEY,
+    MORO8ASM_OP_EOR,
+    MORO8ASM_OP_INA,
+    MORO8ASM_OP_INC,
+    MORO8ASM_OP_INX,
+    MORO8ASM_OP_INY,
+    MORO8ASM_OP_JMP,
+    MORO8ASM_OP_JSR,
+    MORO8ASM_OP_LDA,
+    MORO8ASM_OP_LDX,
+    MORO8ASM_OP_LDY,
+    MORO8ASM_OP_LSR,
+    MORO8ASM_OP_NOP,
+    MORO8ASM_OP_ORA,
+    MORO8ASM_OP_PHA,
+    MORO8ASM_OP_PHP,
+    MORO8ASM_OP_PLA,
+    MORO8ASM_OP_PLP,
+    MORO8ASM_OP_ROL,
+    MORO8ASM_OP_ROR,
+    MORO8ASM_OP_RTS,
+    MORO8ASM_OP_SBC,
+    MORO8ASM_OP_SEC,
+    MORO8ASM_OP_STA,
+    MORO8ASM_OP_STX,
+    MORO8ASM_OP_STY,
+    MORO8ASM_OP_TAX,
+    MORO8ASM_OP_TAY,
+    MORO8ASM_OP_TSX,
+    MORO8ASM_OP_TXA,
+    MORO8ASM_OP_TYA,
+    MORO8ASM_OP_DCB,
+    MORO8ASM_OP_MAX,
+};
+
+/** Enum for addressing modes. */
+enum moro8asm_addr
+{
+    /** LDA $06d3 */
+    MORO8ASM_ADDR_ABS,
+    /** LDA $8000,x */
+    MORO8ASM_ADDR_ABS_X,
+    /** LDA $8000,y */
+    MORO8ASM_ADDR_ABS_Y,
+    /** LDA #$05 */
+    MORO8ASM_ADDR_IMM,
+    /** CLC */
+    MORO8ASM_ADDR_IMPLIED,
+    /** JMP ($9000) */
+    MORO8ASM_ADDR_IND,
+    /** LDA ($05,x) */
+    MORO8ASM_ADDR_IND_X,
+    /** LDA ($10),y */
+    MORO8ASM_ADDR_IND_Y,
+    /** LDX $13 */
+    MORO8ASM_ADDR_ZP,
+    /** LDA $00,x */
+    MORO8ASM_ADDR_ZP_X,
+    /** LDA $00,y */
+    MORO8ASM_ADDR_ZP_Y,
+    MORO8ASM_ADDR_MAX
+};
+
+struct moro8asm_token;
+
+/** Informations about a single token. */
+struct moro8asm_token
+{
+    /** Token id. */
+    enum moro8asm_tok tok;
+    /** Line. */
+    size_t line;
+    /** Column. */
+    size_t col;
+    /** Data associated to this token. */
+    union
+    {
+        /** Parsed label .*/
+        const char* label;
+        /** Parsed number. */
+        moro8_udword number;
+        /** Parsed opcode. */
+        enum moro8asm_op op;
+    } data;
+    /** Next token. */
+    struct moro8asm_token* next;
+};
+
+/** Creates a new token. */
+MORO8ASM_PUBLIC(struct moro8asm_token*) moro8asm_token_create();
+
+/** Deletes a token. */
+MORO8ASM_PUBLIC(void) moro8asm_token_delete(struct moro8asm_token* token);
+
+struct moro8asm_instruction;
+
+/** Informations about a single instruction. */
+struct moro8asm_instruction
+{
+    /** Memory address. */
+    moro8_udword address;
+    /** Line. */
+    size_t line;
+    /** Label on this line. */
+    const char* label;
+    /** Opcode. */
+    enum moro8asm_op op;
+    /** Addressing mode. */
+    enum moro8asm_addr mode;
+    /** The size of this instruction. */
+    moro8_uword size;
+    /** Operand. */
+    struct moro8asm_token* operand;
+    /** Next instruction. */
+    struct moro8asm_instruction* next;
+};
+
+/** Creates a new instruction. */
+MORO8ASM_PUBLIC(struct moro8asm_instruction*) moro8asm_instruction_create();
+
+/** Deletes an instruction. */
+MORO8ASM_PUBLIC(void) moro8asm_instruction_delete(struct moro8asm_instruction* instruction);
+
+struct moro8asm_label_ref;
+
+/** Stores a reference to a label. */
+struct moro8asm_label_ref
+{
+    /** Label reference. */
+    const char* label;
+    /** Corresponding instruction. */
+    struct moro8asm_instruction* instruction;
+    /** Next label. */
+    struct moro8asm_label_ref* next;
+};
+
+/** Creates a new label reference. */
+MORO8ASM_PUBLIC(struct moro8asm_label_ref*) moro8asm_label_ref_create();
+
+/** Deletes a label reference. */
+MORO8ASM_PUBLIC(void) moro8asm_label_ref_delete(struct moro8asm_label_ref* ref);
+
+/** Informations about compiled program. */
+struct moro8asm_program
+{
+    /** Mapping between labels and instructions. */
+    struct moro8asm_label_ref* labels;
+    /** Number of labels. */
+    size_t num_labels;
+    /** First instruction. */
+    struct moro8asm_instruction* lines;
+    /** Number of lines. */
+    size_t num_lines;
+    /** Size of the program in bytes. */
+    moro8_udword size;
+};
+
+/** Creates a new program. */
+MORO8ASM_PUBLIC(struct moro8asm_program*) moro8asm_program_create();
+
+/** Deletes a program. */
+MORO8ASM_PUBLIC(void) moro8asm_program_delete(struct moro8asm_program* program);
+
+/**
+ * Adds a label to the program.
+ * @param[in] program Program
+ * @param[in] label Some null-terminated string
+ * @param[in] line Line the label is found at
+ */
+MORO8ASM_PUBLIC(void) moro8asm_program_add_label(struct moro8asm_program* program, const char* label, struct moro8asm_instruction* line);
+
+/**
+ * Finds an existing label.
+ * @param[in] program Program
+ * @param[in] label Some null-terminated string
+ * @return Line the label is found at.
+ */
+MORO8ASM_PUBLIC(struct moro8asm_instruction*) moro8asm_program_find_label(struct moro8asm_program* program, const char* label);
+
+/**
+ * Extracts tokens from the textual representation of a program.
+ * @param[in] buf Pointer to a buffer
+ * @param[in] size Buffer size
+ * @return A pointer to the first token.
+ */
+MORO8ASM_PUBLIC(struct moro8asm_token*) moro8asm_tokenize(const char* buf, size_t size);
+
+/**
+ * Parses from tokens to program.
+ * @param[in] token Pointer to a list of tokens
+ * @return Parsed program.
+ */
+MORO8ASM_PUBLIC(struct moro8asm_program*) moro8asm_parse(const struct moro8asm_token* token);
+
+/**
+ * Assembles a program.
+ * @param[in] program Pointer to a program
+ * @param[out] out_size Number of bytes written
+ * @return Program bytes.
+ */
+MORO8ASM_PUBLIC(moro8_uword*) moro8asm_assemble(const struct moro8asm_program* program, size_t* out_size);
+
 MORO8ASM_PUBLIC(moro8_uword*) moro8asm_compile(const char* buf, size_t size, size_t* out_size);
 
 #ifdef __cplusplus

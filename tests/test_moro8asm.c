@@ -32,25 +32,35 @@ void test_func(void** initial_state) {
     size_t out_size = 0;
     moro8_uword* out = moro8asm_compile((const char*)buf, buf_size, &out_size);
 
+    // Import into first vm
+    moro8_vm vm1;
+    moro8_init(&vm1);
+
+    moro8_array_memory memory1;
+    moro8_array_memory_init(&memory1);
+    vm1.memory = (moro8_bus*)&memory1;
+
+    moro8_set_memory(&vm1, out, 0x600, out_size);
+
+    // Dump vm state
+    char dump[MORO8_PRINT_BUFFER_SIZE];
+    moro8_print(&vm1, dump, MORO8_PRINT_BUFFER_SIZE);
+
     // Print output state
-    fs_assert_write_file(state->output, (void*)out, out_size);
+    fs_assert_write_file(state->output, (void*)dump, MORO8_PRINT_BUFFER_SIZE - 1);
 
     // Compare expected state
     const char* expected = (const char*)fs_assert_read_file(state->expected, &buf_size);
-}
 
-int setup(void** initial_state)
-{
-    test_state* state = (test_state*)*initial_state;
+    moro8_vm vm2;
+    moro8_init(&vm2);
 
-    return 0;
-}
+    moro8_array_memory memory2;
+    moro8_array_memory_init(&memory2);
+    vm2.memory = (moro8_bus*)&memory2;
 
-int teardown(void** initial_state)
-{
-    test_state* state = (test_state*)*initial_state;
-
-    return 0;
+    moro8_parse(&vm2, expected, buf_size);
+    assert_true(moro8_equal(&vm1, &vm2));
 }
 
 int main(void) {
@@ -96,8 +106,6 @@ int main(void) {
         strcpy((char*)test->name, it->path);
         test->test_func = test_func;
         test->initial_state = (void*)state;
-        test->setup_func = setup;
-        test->teardown_func = teardown;
 
         ++test_index;
     }

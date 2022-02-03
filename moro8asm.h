@@ -206,6 +206,7 @@ enum moro8asm_op
     MORO8ASM_OP_TSX,
     MORO8ASM_OP_TXA,
     MORO8ASM_OP_TYA,
+    MORO8ASM_OP_DCB,
     MORO8ASM_OP_MAX,
 };
 
@@ -252,13 +253,7 @@ struct moro8asm_token
     union
     {
         /** Parsed label .*/
-        struct
-        {
-            /** Buffer. */
-            const char* begin;
-            /** Size. */
-            size_t size;
-        } label;
+        const char* label;
         /** Parsed number. */
         moro8_udword number;
         /** Parsed opcode. */
@@ -274,21 +269,15 @@ MORO8ASM_PUBLIC(struct moro8asm_token*) moro8asm_token_create();
 /** Deletes a token. */
 MORO8ASM_PUBLIC(void) moro8asm_token_delete(struct moro8asm_token* token);
 
-/**
- * Extracts all the tokens from a program.
- * @param[in] buf Pointer to a buffer
- * @param[in] size Buffer size
- * @return A pointer to the first extracted token.
- */
-MORO8ASM_PUBLIC(struct moro8asm_token*) moro8asm_tokenize(const char* buf, size_t size);
-
 struct moro8asm_instruction;
 
 /** Informations about a single instruction. */
 struct moro8asm_instruction
 {
-    /** Memory address. */
-    moro8_udword address;
+    /** Absolute memory address. */
+    moro8_udword pc;
+    /** Relative memory address. */
+    moro8_udword offset;
     /** Line. */
     size_t line;
     /** Label on this line. */
@@ -341,6 +330,8 @@ struct moro8asm_program
     struct moro8asm_instruction* lines;
     /** Number of lines. */
     size_t num_lines;
+    /** Size of the program in bytes. */
+    moro8_udword size;
 };
 
 /** Creates a new program. */
@@ -365,8 +356,28 @@ MORO8ASM_PUBLIC(void) moro8asm_program_add_label(struct moro8asm_program* progra
  */
 MORO8ASM_PUBLIC(struct moro8asm_instruction*) moro8asm_program_find_label(struct moro8asm_program* program, const char* label);
 
-/** Parse a list of tokens to a list of instructions. */
+/**
+ * Extracts tokens from the textual representation of a program.
+ * @param[in] buf Pointer to a buffer
+ * @param[in] size Buffer size
+ * @return A pointer to the first token.
+ */
+MORO8ASM_PUBLIC(struct moro8asm_token*) moro8asm_tokenize(const char* buf, size_t size);
+
+/**
+ * Parses from tokens to program.
+ * @param[in] token Pointer to a list of tokens
+ * @return Parsed program.
+ */
 MORO8ASM_PUBLIC(struct moro8asm_program*) moro8asm_parse(const struct moro8asm_token* token);
+
+/**
+ * Assembles a program.
+ * @param[in] program Pointer to a program
+ * @param[out] out_size Number of bytes written
+ * @return Program bytes.
+ */
+MORO8ASM_PUBLIC(moro8_uword*) moro8asm_assemble(const struct moro8asm_program* program, size_t* out_size);
 
 MORO8ASM_PUBLIC(moro8_uword*) moro8asm_compile(const char* buf, size_t size, size_t* out_size);
 

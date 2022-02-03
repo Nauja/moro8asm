@@ -73,17 +73,18 @@ foreach(_TEST ${_TESTS})
     add_cmocka_test(moro8asm-${_TEST}
                     SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/${_TEST}.c
                     COMPILE_OPTIONS ${DEFAULT_C_COMPILE_FLAGS}
-                    LINK_LIBRARIES ${CMOCKA_LIBRARY} ${LIBFS_LIBRARY} ${MORO8ASM_STATIC_LIB}
+                    LINK_LIBRARIES ${CMOCKA_LIBRARY} ${LIBFS_LIBRARY} ${MORO8_LIBRARY} ${MORO8ASM_STATIC_LIB}
     )
     
     target_include_directories(moro8asm-${_TEST}
         PRIVATE 
             ${CMAKE_BINARY_DIR}
             ${CMOCKA_BINARY_DIR}
+            ${MORO8_BINARY_DIR}
             ${LIBFS_BINARY_DIR})
 
     # Link libfs
-    add_dependencies(moro8asm-${_TEST} libfs)
+    add_dependencies(moro8asm-${_TEST} libfs moro8)
 
 endforeach()
 
