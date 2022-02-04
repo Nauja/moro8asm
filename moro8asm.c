@@ -369,6 +369,67 @@ moro8asm_instruction* moro8asm_program_find_label(moro8asm_program* program, con
     return NULL;
 }
 
+static int moro8asm_strnicmp(const char* left, const char* right, size_t size)
+{
+    if (left == right)
+    {
+        return 0;
+    }
+
+    if (left == NULL)
+    {
+        return -1;
+    }
+
+    if (right == NULL)
+    {
+        return 1;
+    }
+
+    int diff = 0;
+    char c1 = 0;
+    char c2 = 0;
+    for (size_t i = 0; i < size; ++i)
+    {
+        c1 = left[i];
+        c2 = right[i];
+
+        if (c1 == '\0' && c2 == '\0')
+        {
+            return 0;
+        }
+
+        if (c1 == '\0')
+        {
+            return -1;
+        }
+
+        if (c2 == '\0')
+        {
+            return 1;
+        }
+
+        if (c1 >= 'A' && c1 <= 'Z')
+        {
+            c1 = 'a' + (c1 - 'A');
+        }
+
+        if (c2 >= 'A' && c2 <= 'Z')
+        {
+            c2 = 'a' + (c2 - 'A');
+        }
+
+        diff = c1 - c2;
+
+        if (diff != 0)
+        {
+            return diff;
+        }
+    }
+
+    return 0;
+}
+
 static char* moro8asm_strncpy(const char* buf, size_t size)
 {
     char* out = (char*)MORO8ASM_MALLOC(size + 1);
@@ -426,13 +487,13 @@ moro8asm_token* moro8asm_tokenize(const char* buf, size_t size)
             current->tok = MORO8ASM_TOK_LABEL;
 
             // Check for x token
-            if (strnicmp("x", current->data.label, label_size) == 0)
+            if (moro8asm_strnicmp("x", current->data.label, label_size) == 0)
             {
                 current->tok = MORO8ASM_TOK_X;
                 current->data.label = NULL;
             }
             // Check for y token
-            else if (strnicmp("y", current->data.label, label_size) == 0)
+            else if (moro8asm_strnicmp("y", current->data.label, label_size) == 0)
             {
                 current->tok = MORO8ASM_TOK_Y;
                 current->data.label = NULL;
@@ -442,7 +503,7 @@ moro8asm_token* moro8asm_tokenize(const char* buf, size_t size)
                 // Check for opcode token
                 for (moro8asm_op j = 0; j < MORO8ASM_OP_MAX; ++j)
                 {
-                    if (strnicmp(MORO8ASM_OP_TOKEN[j], current->data.label, label_size) == 0)
+                    if (moro8asm_strnicmp(MORO8ASM_OP_TOKEN[j], current->data.label, label_size) == 0)
                     {
                         current->tok = MORO8ASM_TOK_OPCODE;
                         current->data.label = NULL;
