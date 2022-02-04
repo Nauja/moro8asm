@@ -35,7 +35,7 @@ static moro8asm_hooks moro8asm_global_hooks = {
     internal_free
 };
 
-void moro8asm_init_hooks(struct moro8_hooks* hooks)
+void moro8asm_init_hooks(struct moro8asm_hooks* hooks)
 {
     moro8asm_global_hooks.malloc_fn = hooks->malloc_fn;
     moro8asm_global_hooks.free_fn = hooks->free_fn;
@@ -260,7 +260,7 @@ void moro8asm_token_delete(moro8asm_token* token)
     }
 }
 
-static moro8asm_instruction* moro8asm_instruction_create()
+moro8asm_instruction* moro8asm_instruction_create()
 {
     moro8asm_instruction* instruction = (moro8asm_instruction*)MORO8ASM_MALLOC(sizeof(moro8asm_instruction));
     if (!instruction)
@@ -272,7 +272,7 @@ static moro8asm_instruction* moro8asm_instruction_create()
     return instruction;
 }
 
-static void moro8asm_instruction_delete(moro8asm_instruction* instruction)
+void moro8asm_instruction_delete(moro8asm_instruction* instruction)
 {
     moro8asm_instruction* current = instruction;
     moro8asm_instruction* next = NULL;
@@ -298,7 +298,7 @@ moro8asm_label_ref* moro8asm_label_ref_create()
     return ref;
 }
 
-static void moro8asm_label_ref_delete(moro8asm_label_ref* ref)
+void moro8asm_label_ref_delete(moro8asm_label_ref* ref)
 {
     moro8asm_label_ref* current = ref;
     moro8asm_label_ref* next = NULL;
