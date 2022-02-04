@@ -348,27 +348,6 @@ void moro8asm_program_add_label(moro8asm_program* program, const char* label, mo
     program->num_labels++;
 }
 
-moro8asm_instruction* moro8asm_program_find_label(moro8asm_program* program, const char* label)
-{
-    if (!program->labels)
-    {
-        return NULL;
-    }
-
-    moro8asm_label_ref* ref = program->labels;
-    while (ref)
-    {
-        if (stricmp(ref->label, label) == 0)
-        {
-            return ref->instruction;
-        }
-
-        ref = ref->next;
-    }
-
-    return NULL;
-}
-
 static int moro8asm_strnicmp(const char* left, const char* right, size_t size)
 {
     if (left == right)
@@ -428,6 +407,34 @@ static int moro8asm_strnicmp(const char* left, const char* right, size_t size)
     }
 
     return 0;
+}
+
+static int moro8asm_stricmp(const char* left, const char* right)
+{
+    size_t size = 0;
+    for (; right[size] != '\0'; ++size);
+    return moro8asm_strnicmp(left, right, size);
+}
+
+moro8asm_instruction* moro8asm_program_find_label(moro8asm_program* program, const char* label)
+{
+    if (!program->labels)
+    {
+        return NULL;
+    }
+
+    moro8asm_label_ref* ref = program->labels;
+    while (ref)
+    {
+        if (moro8asm_stricmp(ref->label, label) == 0)
+        {
+            return ref->instruction;
+        }
+
+        ref = ref->next;
+    }
+
+    return NULL;
 }
 
 static char* moro8asm_strncpy(const char* buf, size_t size)
