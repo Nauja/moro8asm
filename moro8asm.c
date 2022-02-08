@@ -286,6 +286,26 @@ void moro8asm_instruction_delete(moro8asm_instruction* instruction)
     }
 }
 
+moro8_udword moro8asm_instruction_get_pc(const moro8asm_instruction* instruction)
+{
+    return instruction->pc;
+}
+
+size_t moro8asm_instruction_get_line(const moro8asm_instruction* instruction)
+{
+    return instruction->line;
+}
+
+moro8_uword moro8asm_instruction_get_size(const moro8asm_instruction* instruction)
+{
+    return instruction->size;
+}
+
+moro8asm_instruction* moro8asm_instruction_get_next(const moro8asm_instruction* instruction)
+{
+    return instruction->next;
+}
+
 moro8asm_label_ref* moro8asm_label_ref_create()
 {
     moro8asm_label_ref* ref = (moro8asm_label_ref*)MORO8ASM_MALLOC(sizeof(moro8asm_label_ref));
@@ -435,6 +455,35 @@ moro8asm_instruction* moro8asm_program_find_label(moro8asm_program* program, con
     }
 
     return NULL;
+}
+
+moro8asm_label_ref* moro8asm_program_get_label(const moro8asm_program* program, size_t index)
+{
+    moro8asm_label_ref* ptr = program->labels;
+    for (size_t i = 0; i < index && ptr; ++i) ptr = ptr->next;
+    return ptr;
+}
+
+size_t moro8asm_program_num_labels(const moro8asm_program* program)
+{
+    return program->num_labels;
+}
+
+moro8asm_instruction* moro8asm_program_get_line(const moro8asm_program* program, size_t index)
+{
+    moro8asm_label_ref* ptr = program->lines;
+    for (size_t i = 0; i < index && ptr; ++i) ptr = ptr->next;
+    return ptr;
+}
+
+size_t moro8asm_program_num_lines(const moro8asm_program* program)
+{
+    return program->num_lines;
+}
+
+moro8_udword moro8asm_program_size(const moro8asm_program* program)
+{
+    return program->size;
 }
 
 static char* moro8asm_strncpy(const char* buf, size_t size)

@@ -302,6 +302,34 @@ MORO8ASM_PUBLIC(struct moro8asm_instruction*) moro8asm_instruction_create();
 /** Deletes an instruction. */
 MORO8ASM_PUBLIC(void) moro8asm_instruction_delete(struct moro8asm_instruction* instruction);
 
+/**
+ * Gets the address of an instruction.
+ * @param[in] instruction Some instruction
+ * @return Address.
+ */
+MORO8ASM_PUBLIC(moro8_udword) moro8asm_instruction_get_pc(const struct moro8asm_instruction* instruction);
+
+/**
+ * Gets the line of an instruction.
+ * @param[in] instruction Some instruction
+ * @return Line number.
+ */
+MORO8ASM_PUBLIC(size_t) moro8asm_instruction_get_line(const struct moro8asm_instruction* instruction);
+
+/**
+ * Gets the size of an instruction.
+ * @param[in] instruction Some instruction
+ * @return Size.
+ */
+MORO8ASM_PUBLIC(moro8_uword) moro8asm_instruction_get_size(const struct moro8asm_instruction* instruction);
+
+/**
+ * Gets the next instruction.
+ * @param[in] instruction Some instruction
+ * @return Pointer to the next instruction or NULL.
+ */
+MORO8ASM_PUBLIC(struct moro8asm_instruction*) moro8asm_instruction_get_next(const struct moro8asm_instruction* instruction);
+
 struct moro8asm_label_ref;
 
 /** Stores a reference to a label. */
@@ -357,6 +385,43 @@ MORO8ASM_PUBLIC(void) moro8asm_program_add_label(struct moro8asm_program* progra
  * @return Line the label is found at.
  */
 MORO8ASM_PUBLIC(struct moro8asm_instruction*) moro8asm_program_find_label(struct moro8asm_program* program, const char* label);
+
+/**
+ * Gets a label of the program.
+ * @param[in] program Program
+ * @param[in] index Label number
+ * @return Pointer to the label or NULL.
+ */
+MORO8ASM_PUBLIC(struct moro8asm_label_ref*) moro8asm_program_get_label(const struct moro8asm_program* program, size_t index);
+
+/**
+ * Gets the number of labels.
+ * @param[in] program Program
+ * @return Number of labels.
+ */
+MORO8ASM_PUBLIC(size_t) moro8asm_program_num_labels(const struct moro8asm_program* program);
+
+/**
+ * Gets a line of the program.
+ * @param[in] program Program
+ * @param[in] index Line number
+ * @return Pointer to the line or NULL.
+ */
+MORO8ASM_PUBLIC(struct moro8asm_instruction*) moro8asm_program_get_line(const struct moro8asm_program* program, size_t index);
+
+/**
+ * Gets the number of lines.
+ * @param[in] program Program
+ * @return Number of lines.
+ */
+MORO8ASM_PUBLIC(size_t) moro8asm_program_num_lines(const struct moro8asm_program* program);
+
+/**
+ * Gets the number of bytes in the program.
+ * @param[in] program Program
+ * @return Number of bytes.
+ */
+MORO8ASM_PUBLIC(moro8_udword) moro8asm_program_size(const struct moro8asm_program* program);
 
 /**
  * First step: Extracts tokens from the textual representation of a program.
