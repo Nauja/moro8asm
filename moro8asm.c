@@ -471,7 +471,7 @@ size_t moro8asm_program_num_labels(const moro8asm_program* program)
 
 moro8asm_instruction* moro8asm_program_get_line(const moro8asm_program* program, size_t index)
 {
-    moro8asm_label_ref* ptr = program->lines;
+    moro8asm_instruction* ptr = program->lines;
     for (size_t i = 0; i < index && ptr; ++i) ptr = ptr->next;
     return ptr;
 }
