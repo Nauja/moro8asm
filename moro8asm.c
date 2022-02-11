@@ -1063,7 +1063,6 @@ moro8asm_program* moro8asm_parse(const moro8asm_token* token)
         // Set line informations
         data->pc = pc;
         data->offset = offset;
-        data->line = next->line;
 
         // There is a label on this line
         if (next->tok == MORO8ASM_TOK_LABEL)
@@ -1088,6 +1087,7 @@ moro8asm_program* moro8asm_parse(const moro8asm_token* token)
             break;
         }
 
+        data->line = next->line;
         data->op = next->data.op;
         next = next->next;
         if (!moro8asm_parse_instruction(data, next, &next))
