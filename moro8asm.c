@@ -51,10 +51,90 @@ typedef enum moro8asm_tok moro8asm_tok;
 typedef enum moro8asm_op moro8asm_op;
 typedef enum moro8_opcode moro8_opcode;
 typedef enum moro8asm_addr moro8asm_addr;
+typedef enum moro8asm_label_type moro8asm_label_type;
 typedef struct moro8asm_token moro8asm_token;
 typedef struct moro8asm_instruction moro8asm_instruction;
 typedef struct moro8asm_label_ref moro8asm_label_ref;
+typedef struct moro8asm_module moro8asm_module;
 typedef struct moro8asm_program moro8asm_program;
+
+static char* moro8asm_strncpy(const char* buf, size_t size)
+{
+    char* out = (char*)MORO8ASM_MALLOC(size + 1);
+    memcpy(out, buf, size);
+    out[size] = '\0';
+    return out;
+}
+
+#define moro8asm_strlen strlen
+
+static int moro8asm_strnicmp(const char* left, const char* right, size_t size)
+{
+    if (left == right)
+    {
+        return 0;
+    }
+
+    if (left == NULL)
+    {
+        return -1;
+    }
+
+    if (right == NULL)
+    {
+        return 1;
+    }
+
+    int diff = 0;
+    char c1 = 0;
+    char c2 = 0;
+    for (size_t i = 0; i < size; ++i)
+    {
+        c1 = left[i];
+        c2 = right[i];
+
+        if (c1 == '\0' && c2 == '\0')
+        {
+            return 0;
+        }
+
+        if (c1 == '\0')
+        {
+            return -1;
+        }
+
+        if (c2 == '\0')
+        {
+            return 1;
+        }
+
+        if (c1 >= 'A' && c1 <= 'Z')
+        {
+            c1 = 'a' + (c1 - 'A');
+        }
+
+        if (c2 >= 'A' && c2 <= 'Z')
+        {
+            c2 = 'a' + (c2 - 'A');
+        }
+
+        diff = c1 - c2;
+
+        if (diff != 0)
+        {
+            return diff;
+        }
+    }
+
+    return 0;
+}
+
+static int moro8asm_stricmp(const char* left, const char* right)
+{
+    size_t size = 0;
+    for (; right[size] != '\0'; ++size);
+    return moro8asm_strnicmp(left, right, size);
+}
 
 /** Map opcodes to tokens. */
 static const char* MORO8ASM_OP_TOKEN[MORO8ASM_OP_MAX] = {
@@ -233,12 +313,13 @@ MORO8ASM_PUBLIC(moro8asm_token*) moro8asm_token_create()
         return NULL;
     }
 
-    token->tok = MORO8ASM_TOK_END;
-    token->line = 0;
-    token->col = 0;
-    token->data.label = NULL;
-    token->next = NULL;
+    moro8asm_token_init(token);
     return token;
+}
+
+MORO8ASM_PUBLIC(void) moro8asm_token_init(moro8asm_token* token)
+{
+    memset(token, 0, sizeof(moro8asm_token));
 }
 
 MORO8ASM_PUBLIC(void) moro8asm_token_delete(moro8asm_token* token)
@@ -268,8 +349,13 @@ MORO8ASM_PUBLIC(moro8asm_instruction*) moro8asm_instruction_create()
         return NULL;
     }
 
-    memset(instruction, 0, sizeof(moro8asm_instruction));
+    moro8asm_instruction_init(instruction);
     return instruction;
+}
+
+MORO8ASM_PUBLIC(void) moro8asm_instruction_init(struct moro8asm_instruction* instruction)
+{
+    memset(instruction, 0, sizeof(moro8asm_instruction));
 }
 
 MORO8ASM_PUBLIC(void) moro8asm_instruction_delete(moro8asm_instruction* instruction)
@@ -314,8 +400,13 @@ MORO8ASM_PUBLIC(moro8asm_label_ref*) moro8asm_label_ref_create()
         return NULL;
     }
 
-    memset(ref, 0, sizeof(moro8asm_label_ref));
+    moro8asm_label_ref_init(ref);
     return ref;
+}
+
+MORO8ASM_PUBLIC(void) moro8asm_label_ref_init(moro8asm_label_ref* ref)
+{
+    memset(ref, 0, sizeof(moro8asm_label_ref));
 }
 
 MORO8ASM_PUBLIC(void) moro8asm_label_ref_delete(moro8asm_label_ref* ref)
@@ -327,8 +418,222 @@ MORO8ASM_PUBLIC(void) moro8asm_label_ref_delete(moro8asm_label_ref* ref)
     {
         next = current->next;
         current->next = NULL;
+        MORO8ASM_FREE(current->label);
+        current->label = NULL;
         MORO8ASM_FREE(current);
         current = next;
+    }
+}
+
+MORO8ASM_PUBLIC(struct moro8asm_module*) moro8asm_module_create()
+{
+    moro8asm_module* module = (moro8asm_module*)MORO8ASM_MALLOC(sizeof(moro8asm_module));
+    if (!module)
+    {
+        return NULL;
+    }
+
+    moro8asm_module_init(module);
+    return module;
+}
+
+MORO8ASM_PUBLIC(void) moro8asm_module_init(struct moro8asm_module* module)
+{
+    memset(module, 0, sizeof(moro8asm_module));
+}
+
+MORO8ASM_PUBLIC(void) moro8asm_module_delete(struct moro8asm_module* module)
+{
+    moro8asm_module* current = module;
+    moro8asm_module* next = NULL;
+
+    while (current != NULL)
+    {
+        next = current->next;
+        current->next = NULL;
+        moro8asm_label_ref_delete(module->labels);
+        module->labels = NULL;
+        MORO8ASM_FREE(current);
+        current = next;
+    }
+}
+
+static void moro8asm_module_add_label_type(moro8asm_module* module, const char* label, moro8asm_instruction* line, moro8asm_label_type type)
+{
+    if (moro8asm_module_find_label(module, label))
+    {
+        return;
+    }
+
+    moro8asm_label_ref* ref = moro8asm_label_ref_create();
+    ref->module = module;
+    ref->type = type;
+    ref->label = moro8asm_strncpy(label, moro8asm_strlen(label));
+    ref->instruction = line;
+    ref->next = module->labels;
+    module->labels = ref;
+    module->num_labels++;
+}
+
+MORO8ASM_PUBLIC(void) moro8asm_module_add_import(moro8asm_module* module, const char* label)
+{
+    moro8asm_module_add_label_type(module, label, NULL, MORO8ASM_LABEL_TYPE_IMPORT);
+}
+
+MORO8ASM_PUBLIC(void) moro8asm_module_add_export(moro8asm_module* module, const char* label)
+{
+    moro8asm_module_add_label_type(module, label, NULL, MORO8ASM_LABEL_TYPE_EXPORT);
+}
+
+MORO8ASM_PUBLIC(void) moro8asm_module_add_label(moro8asm_module* module, const char* label, moro8asm_instruction* line)
+{
+    moro8asm_module_add_label_type(module, label, line, MORO8ASM_LABEL_TYPE_LOCAL);
+}
+
+MORO8ASM_PUBLIC(size_t) moro8asm_module_num_labels(const moro8asm_module* module)
+{
+    return module->num_labels;
+}
+
+MORO8ASM_PUBLIC(moro8asm_label_ref*) moro8asm_module_find_label(moro8asm_module* module, const char* label)
+{
+    if (!module->labels)
+    {
+        return NULL;
+    }
+
+    moro8asm_label_ref* ref = module->labels;
+    while (ref)
+    {
+        if (moro8asm_stricmp(ref->label, label) == 0)
+        {
+            return ref;
+        }
+
+        ref = ref->next;
+    }
+
+    return NULL;
+}
+
+MORO8ASM_PUBLIC(moro8asm_label_ref*) moro8asm_module_get_label(const moro8asm_module* module, size_t index)
+{
+    moro8asm_label_ref* ptr = module->labels;
+    for (size_t i = 0; i < index && ptr; ++i) ptr = ptr->next;
+    return ptr;
+}
+
+MORO8ASM_PUBLIC(moro8asm_instruction*) moro8asm_module_get_line(const moro8asm_module* module, size_t index)
+{
+    moro8asm_instruction* ptr = module->lines;
+    for (size_t i = 0; i < index && ptr; ++i) ptr = ptr->next;
+    return ptr;
+}
+
+MORO8ASM_PUBLIC(size_t) moro8asm_module_num_lines(const moro8asm_module* module)
+{
+    return module->num_lines;
+}
+
+MORO8ASM_PUBLIC(moro8asm_module*) moro8asm_module_load(moro8asm_module* module, const char* buf, size_t size)
+{
+    moro8asm_token* token = moro8asm_tokenize(buf, size);
+    if (!token)
+    {
+        return NULL;
+    }
+
+    // Placeholder instruction for the while loop
+    module->lines = moro8asm_instruction_create();
+    if (!module->lines)
+    {
+        moro8asm_token_delete(token);
+        return NULL;
+    }
+
+    moro8asm_instruction* data = module->lines;
+    const moro8asm_token* next = token;
+    while (next)
+    {
+        if (next->tok == MORO8ASM_TOK_END)
+        {
+            break;
+        }
+
+        // Parse * = $FFFF ! probably outdated
+        if (next->tok == MORO8ASM_TOK_STAR)
+        {
+            next = next->next;
+            if (!next || next->tok != MORO8ASM_TOK_EQUAL)
+            {
+                printf("Missing = after *");
+                break;
+            }
+
+            next = next->next;
+            if (!next || (next->tok != MORO8ASM_TOK_WORD && next->tok != MORO8ASM_TOK_DWORD))
+            {
+                printf("Expected number after * =");
+                break;
+            }
+
+            next = next->next;
+        }
+
+        // Push a new instruction
+        data->next = moro8asm_instruction_create();
+        module->num_lines++;
+        data = data->next;
+
+        // There is a label on this line
+        if (next->tok == MORO8ASM_TOK_LABEL)
+        {
+            data->label = next->data.label;
+
+            if (!next->next || next->next->tok != MORO8ASM_TOK_COLON)
+            {
+                printf("Missing : after label");
+                break;
+            }
+
+            moro8asm_module_add_label(module, data->label, data);
+
+            next = next->next->next;
+        }
+
+        // Parse opcode
+        if (next->tok != MORO8ASM_TOK_OPCODE)
+        {
+            printf("Expected an opcode");
+            break;
+        }
+
+        data->line = next->line;
+        data->op = next->data.op;
+        next = next->next;
+        if (!moro8asm_parse_instruction(data, next, &next))
+        {
+            printf("Failed to parse opcode");
+            break;
+        }
+    }
+
+    // Delete the first placeholder instruction
+    data = module->lines->next;
+    module->lines->next = NULL;
+    moro8asm_instruction_delete(module->lines);
+    module->lines = data;
+    moro8asm_token_delete(token);
+    return module;
+}
+
+static void moro8asm_module_unlink(moro8asm_module* module)
+{
+    moro8asm_label_ref* current = module->labels;
+    while (current)
+    {
+        current->address = 0;
+        current = current->next;
     }
 }
 
@@ -340,158 +645,42 @@ MORO8ASM_PUBLIC(moro8asm_program*) moro8asm_program_create()
         return NULL;
     }
 
-    memset(program, 0, sizeof(moro8asm_program));
+    moro8asm_program_init(program);
     return program;
+}
+
+MORO8ASM_PUBLIC(void) moro8asm_program_init(struct moro8asm_program* program)
+{
+    memset(program, 0, sizeof(moro8asm_program));
 }
 
 MORO8ASM_PUBLIC(void) moro8asm_program_delete(struct moro8asm_program* program)
 {
-    moro8asm_label_ref_delete(program->labels);
-    program->labels = NULL;
-    moro8asm_instruction_delete(program->lines);
-    program->lines = NULL;
+    moro8asm_module_delete(program->modules);
+    program->modules = NULL;
     MORO8ASM_FREE(program);
 }
 
-MORO8ASM_PUBLIC(void) moro8asm_program_add_label(moro8asm_program* program, const char* label, moro8asm_instruction* line)
+MORO8ASM_PUBLIC(void) moro8asm_program_add_module(struct moro8asm_program* program, struct moro8asm_module* module)
 {
-    if (moro8asm_program_find_label(program, label))
-    {
-        return;
-    }
-
-    moro8asm_label_ref* ref = moro8asm_label_ref_create();
-    ref->label = label;
-    ref->instruction = line;
-    ref->next = program->labels;
-    program->labels = ref;
-    program->num_labels++;
-}
-
-static int moro8asm_strnicmp(const char* left, const char* right, size_t size)
-{
-    if (left == right)
-    {
-        return 0;
-    }
-
-    if (left == NULL)
-    {
-        return -1;
-    }
-
-    if (right == NULL)
-    {
-        return 1;
-    }
-
-    int diff = 0;
-    char c1 = 0;
-    char c2 = 0;
-    for (size_t i = 0; i < size; ++i)
-    {
-        c1 = left[i];
-        c2 = right[i];
-
-        if (c1 == '\0' && c2 == '\0')
-        {
-            return 0;
-        }
-
-        if (c1 == '\0')
-        {
-            return -1;
-        }
-
-        if (c2 == '\0')
-        {
-            return 1;
-        }
-
-        if (c1 >= 'A' && c1 <= 'Z')
-        {
-            c1 = 'a' + (c1 - 'A');
-        }
-
-        if (c2 >= 'A' && c2 <= 'Z')
-        {
-            c2 = 'a' + (c2 - 'A');
-        }
-
-        diff = c1 - c2;
-
-        if (diff != 0)
-        {
-            return diff;
-        }
-    }
-
-    return 0;
-}
-
-static int moro8asm_stricmp(const char* left, const char* right)
-{
-    size_t size = 0;
-    for (; right[size] != '\0'; ++size);
-    return moro8asm_strnicmp(left, right, size);
-}
-
-MORO8ASM_PUBLIC(moro8asm_instruction*) moro8asm_program_find_label(moro8asm_program* program, const char* label)
-{
-    if (!program->labels)
-    {
-        return NULL;
-    }
-
-    moro8asm_label_ref* ref = program->labels;
-    while (ref)
-    {
-        if (moro8asm_stricmp(ref->label, label) == 0)
-        {
-            return ref->instruction;
-        }
-
-        ref = ref->next;
-    }
-
-    return NULL;
-}
-
-MORO8ASM_PUBLIC(moro8asm_label_ref*) moro8asm_program_get_label(const moro8asm_program* program, size_t index)
-{
-    moro8asm_label_ref* ptr = program->labels;
-    for (size_t i = 0; i < index && ptr; ++i) ptr = ptr->next;
-    return ptr;
-}
-
-MORO8ASM_PUBLIC(size_t) moro8asm_program_num_labels(const moro8asm_program* program)
-{
-    return program->num_labels;
-}
-
-MORO8ASM_PUBLIC(moro8asm_instruction*) moro8asm_program_get_line(const moro8asm_program* program, size_t index)
-{
-    moro8asm_instruction* ptr = program->lines;
-    for (size_t i = 0; i < index && ptr; ++i) ptr = ptr->next;
-    return ptr;
-}
-
-MORO8ASM_PUBLIC(size_t) moro8asm_program_num_lines(const moro8asm_program* program)
-{
-    return program->num_lines;
+    module->next = program->modules;
+    program->modules = module;
+    program->num_modules++;
 }
 
 MORO8ASM_PUBLIC(moro8_udword) moro8asm_program_size(const moro8asm_program* program)
 {
-    return program->size;
+    return 0;
 }
 
-static char* moro8asm_strncpy(const char* buf, size_t size)
+static void moro8asm_program_unlink(moro8asm_program* program)
 {
-    char* out = (char*)MORO8ASM_MALLOC(size + 1);
-    memcpy(out, buf, size);
-    out[size] = '\0';
-    return out;
+    moro8asm_module* current = program->modules;
+    while (current)
+    {
+        moro8asm_module_unlink(current);
+        current = current->next;
+    }
 }
 
 MORO8ASM_PUBLIC(moro8asm_token*) moro8asm_tokenize(const char* buf, size_t size)
@@ -1000,115 +1189,6 @@ static int moro8asm_parse_instruction(moro8asm_instruction* instruction, const m
     return MORO8ASM_FALSE;
 }
 
-moro8asm_program* moro8asm_parse(const moro8asm_token* token)
-{
-    if (!token)
-    {
-        return NULL;
-    }
-
-    moro8asm_program* program = moro8asm_program_create();
-    if (!program)
-    {
-        return NULL;
-    }
-
-    // Placeholder instruction for the while loop
-    program->lines = moro8asm_instruction_create();
-    if (!program->lines)
-    {
-        moro8asm_program_delete(program);
-        return NULL;
-    }
-
-    // Program counter
-    moro8_udword pc = MORO8_ROM_OFFSET;
-    moro8_udword offset = 0;
-
-    moro8asm_instruction* data = program->lines;
-    const moro8asm_token* next = token;
-    while (next)
-    {
-        if (next->tok == MORO8ASM_TOK_END)
-        {
-            break;
-        }
-
-        // Parse * = $FFFF
-        if (next->tok == MORO8ASM_TOK_STAR)
-        {
-            next = next->next;
-            if (!next || next->tok != MORO8ASM_TOK_EQUAL)
-            {
-                printf("Missing = after *");
-                break;
-            }
-
-            next = next->next;
-            if (!next || (next->tok != MORO8ASM_TOK_WORD && next->tok != MORO8ASM_TOK_DWORD))
-            {
-                printf("Expected number after * =");
-                break;
-            }
-
-            pc = next->data.number;
-            next = next->next;
-        }
-
-        // Push a new instruction
-        data->next = moro8asm_instruction_create();
-        program->num_lines++;
-        data = data->next;
-
-        // Set line informations
-        data->pc = pc;
-        data->offset = offset;
-
-        // There is a label on this line
-        if (next->tok == MORO8ASM_TOK_LABEL)
-        {
-            data->label = next->data.label;
-
-            if (!next->next || next->next->tok != MORO8ASM_TOK_COLON)
-            {
-                printf("Missing : after label");
-                break;
-            }
-
-            moro8asm_program_add_label(program, data->label, data);
-
-            next = next->next->next;
-        }
-
-        // Parse opcode
-        if (next->tok != MORO8ASM_TOK_OPCODE)
-        {
-            printf("Expected an opcode");
-            break;
-        }
-
-        data->line = next->line;
-        data->op = next->data.op;
-        next = next->next;
-        if (!moro8asm_parse_instruction(data, next, &next))
-        {
-            printf("Failed to parse opcode");
-            break;
-        }
-        pc += data->size;
-        offset += data->size;
-    }
-
-    program->size = offset;
-
-    // Delete the first placeholder instruction
-    data = program->lines->next;
-    program->lines->next = NULL;
-    moro8asm_instruction_delete(program->lines);
-    program->lines = data;
-    return program;
-}
-
 static int moro8asm_assemble_dcb(const struct moro8asm_program* program, const moro8asm_instruction* line, moro8_uword* memory)
 {
     if (line->op != MORO8ASM_OP_DCB)
@@ -1181,15 +1261,10 @@ static int moro8asm_assemble_line(const struct moro8asm_program* program, const 
     return MORO8ASM_TRUE;
 }
 
-MORO8ASM_PUBLIC(moro8_uword*) moro8asm_assemble(const struct moro8asm_program* program, size_t* out_size)
+MORO8ASM_PUBLIC(moro8_udword) moro8asm_assemble(moro8asm_program* program, moro8_uword* buf, moro8_udword size)
 {
-    moro8_uword* memory = (moro8_uword*)MORO8ASM_MALLOC(program->size);
-    if (!memory)
-    {
-        return NULL;
-    }
-
-    memset(memory, 0, program->size);
+    memset(buf, 0, size);
+    moro8asm_program_unlink(program);
 
     moro8asm_instruction* line = program->lines;
     while (line)
@@ -1201,14 +1276,4 @@ MORO8ASM_PUBLIC(moro8_uword*) moro8asm_assemble(const struct moro8asm_program* p
 
     *out_size = program->size;
     return memory;
-}
-
-MORO8ASM_PUBLIC(moro8_uword*) moro8asm_compile(const char* buf, size_t size, size_t* out_size)
-{
-    moro8asm_token* token = moro8asm_tokenize(buf, size);
-    moro8asm_program* program = moro8asm_parse(token);
-    moro8_uword* bytes = moro8asm_assemble(program, out_size);
-    moro8asm_program_delete(program);
-    moro8asm_token_delete(token);
-    return bytes;
 }
