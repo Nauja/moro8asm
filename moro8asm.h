@@ -240,6 +240,20 @@ enum moro8asm_addr
     MORO8ASM_ADDR_MAX
 };
 
+enum moro8asm_seg
+{
+    /** ZeroPage segment */
+    MORO8ASM_SEG_ZP,
+    /** Header segment */
+    MORO8ASM_SEG_HEADER,
+    /** Startup segment */
+    MORO8ASM_SEG_STARTUP,
+    /** Code segment */
+    MORO8ASM_SEG_CODE,
+    /** Data segment */
+    MORO8ASM_SEG_DATA
+};
+
 struct moro8asm_token;
 
 /** Informations about a single token. */
@@ -269,21 +283,27 @@ struct moro8asm_token
 MORO8ASM_PUBLIC(struct moro8asm_token*) moro8asm_token_create();
 
 /** Deletes a token. */
+MORO8ASM_PUBLIC(void) moro8asm_token_init(struct moro8asm_token* token);
+
+/** Deletes a token. */
 MORO8ASM_PUBLIC(void) moro8asm_token_delete(struct moro8asm_token* token);
 
 struct moro8asm_instruction;
+struct moro8asm_label_ref;
 
 /** Informations about a single instruction. */
 struct moro8asm_instruction
 {
+    /** Segment containing the instruction. */
+    enum moro8asm_seg segment;
+    /** Label containing the instruction. */
+    struct moro8asm_label_ref* label;
     /** Absolute memory address. */
     moro8_udword pc;
     /** Relative memory address. */
     moro8_udword offset;
     /** Line. */
     size_t line;
-    /** Label on this line. */
-    const char* label;
     /** Opcode. */
     enum moro8asm_op op;
     /** Addressing mode. */
@@ -298,6 +318,9 @@ struct moro8asm_instruction
 
 /** Creates a new instruction. */
 MORO8ASM_PUBLIC(struct moro8asm_instruction*) moro8asm_instruction_create();
+
+/** Deletes an instruction. */
+MORO8ASM_PUBLIC(void) moro8asm_instruction_init(struct moro8asm_instruction* instruction);
 
 /** Deletes an instruction. */
 MORO8ASM_PUBLIC(void) moro8asm_instruction_delete(struct moro8asm_instruction* instruction);
@@ -330,11 +353,22 @@ MORO8ASM_PUBLIC(moro8_uword) moro8asm_instruction_get_size(const struct moro8asm
  */
 MORO8ASM_PUBLIC(struct moro8asm_instruction*) moro8asm_instruction_get_next(const struct moro8asm_instruction* instruction);
 
-struct moro8asm_label_ref;
+enum moro8asm_label_type
+{
+    MORO8ASM_LABEL_TYPE_LOCAL,
+    MORO8ASM_LABEL_TYPE_IMPORT,
+    MORO8ASM_LABEL_TYPE_EXPORT
+};
+
+struct moro8asm_module;
 
 /** Stores a reference to a label. */
 struct moro8asm_label_ref
 {
+    /** Module containing the label. */
+    struct moro8asm_module* module;
+    /** Label type. */
+    enum moro8asm_label_type type;
     /** Label reference. */
     const char* label;
     /** Corresponding instruction. */
@@ -343,15 +377,20 @@ struct moro8asm_label_ref
     struct moro8asm_label_ref* next;
 };
 
-/** Creates a new label reference. */
+/** Allocates and initializes a new moro8asm_label_ref instance. */
 MORO8ASM_PUBLIC(struct moro8asm_label_ref*) moro8asm_label_ref_create();
 
-/** Deletes a label reference. */
+/** Initializes an already allocated moro8asm_label_ref instance. */
+MORO8ASM_PUBLIC(void) moro8asm_label_ref_init(struct moro8asm_label_ref* ref);
+
+/** Frees up memory allocated for a moro8asm_label_ref instance. */
 MORO8ASM_PUBLIC(void) moro8asm_label_ref_delete(struct moro8asm_label_ref* ref);
 
-/** Informations about compiled program. */
-struct moro8asm_program
+/** Informations about a single module. */
+struct moro8asm_module
 {
+    /** Filename */
+    const char* path;
     /** Mapping between labels and instructions. */
     struct moro8asm_label_ref* labels;
     /** Number of labels. */
@@ -360,61 +399,118 @@ struct moro8asm_program
     struct moro8asm_instruction* lines;
     /** Number of lines. */
     size_t num_lines;
-    /** Size of the program in bytes. */
-    moro8_udword size;
+    /** Next module. */
+    struct moro8asm_module* next;
+};
+
+/** Creates a new module. */
+MORO8ASM_PUBLIC(struct moro8asm_module*) moro8asm_module_create();
+
+/** Deletes a module. */
+MORO8ASM_PUBLIC(void) moro8asm_module_init(struct moro8asm_module* module);
+
+/** Deletes a module. */
+MORO8ASM_PUBLIC(void) moro8asm_module_delete(struct moro8asm_module* module);
+
+/**
+ * Adds an import to the module.
+ * @param[in] module Module
+ * @param[in] label Some null-terminated string
+ */
+MORO8ASM_PUBLIC(void) moro8asm_module_add_import(struct moro8asm_module* module, const char* label);
+
+/**
+ * Adds an export to the module.
+ * @param[in] module Module
+ * @param[in] label Some null-terminated string
+ */
+MORO8ASM_PUBLIC(void) moro8asm_module_add_export(struct moro8asm_module* module, const char* label);
+
+/**
+ * Adds a label to the module.
+ * @param[in] module Module
+ * @param[in] label Some null-terminated string
+ * @param[in] line Line the label is found at
+ */
+MORO8ASM_PUBLIC(void) moro8asm_module_add_label(struct moro8asm_module* module, const char* label, struct moro8asm_instruction* line);
+
+/**
+ * Gets the number of labels.
+ * @param[in] module Module
+ * @return Number of labels.
+ */
+MORO8ASM_PUBLIC(size_t) moro8asm_module_num_labels(const struct moro8asm_module* module);
+
+/**
+ * Finds an existing label.
+ * @param[in] module Module
+ * @param[in] label Some null-terminated string
+ * @return Pointer to the label or NULL.
+ */
+MORO8ASM_PUBLIC(struct moro8asm_label_ref*) moro8asm_module_find_label(struct moro8asm_module* module, const char* label);
+
+/**
+ * Gets a label of the program.
+ * @param[in] module Module
+ * @param[in] index Label number
+ * @return Pointer to the label or NULL.
+ */
+MORO8ASM_PUBLIC(struct moro8asm_label_ref*) moro8asm_module_get_label(const struct moro8asm_module* module, size_t index);
+
+/**
+ * Gets a line of the program.
+ * @param[in] module Module
+ * @param[in] index Line number
+ * @return Pointer to the line or NULL.
+ */
+MORO8ASM_PUBLIC(struct moro8asm_instruction*) moro8asm_module_get_line(const struct moro8asm_module* module, size_t index);
+
+/**
+ * Gets the number of lines.
+ * @param[in] module Module
+ * @return Number of lines.
+ */
+MORO8ASM_PUBLIC(size_t) moro8asm_module_num_lines(const struct moro8asm_module* module);
+
+/**
+ * Gets the number of lines.
+ * @param[in] module Module
+ * @return Number of lines.
+ */
+MORO8ASM_PUBLIC(size_t) moro8asm_module_num_lines(const struct moro8asm_module* module);
+
+/** Parse the textual representation of a module.
+ * @param[in] module Module
+ * @param[in] buf Pointer to a buffer
+ * @param[in] size Buffer size
+ * @return Pointer to the module or NULL.
+ */
+MORO8ASM_PUBLIC(struct moro8asm_module*) moro8asm_module_load(struct moro8asm_module* module, const char* buf, size_t size);
+
+/** Informations about compiled program. */
+struct moro8asm_program
+{
+    /** List of modules. */
+    struct moro8asm_label_ref* modules;
+    /** Number of modules. */
+    size_t num_modules;
 };
 
 /** Creates a new program. */
 MORO8ASM_PUBLIC(struct moro8asm_program*) moro8asm_program_create();
 
 /** Deletes a program. */
+MORO8ASM_PUBLIC(void) moro8asm_program_init(struct moro8asm_program* program);
+
+/** Deletes a program. */
 MORO8ASM_PUBLIC(void) moro8asm_program_delete(struct moro8asm_program* program);
 
 /**
- * Adds a label to the program.
+ * Adds a module to the program.
  * @param[in] program Program
- * @param[in] label Some null-terminated string
- * @param[in] line Line the label is found at
+ * @param[in] module Module
  */
-MORO8ASM_PUBLIC(void) moro8asm_program_add_label(struct moro8asm_program* program, const char* label, struct moro8asm_instruction* line);
-
-/**
- * Finds an existing label.
- * @param[in] program Program
- * @param[in] label Some null-terminated string
- * @return Line the label is found at.
- */
-MORO8ASM_PUBLIC(struct moro8asm_instruction*) moro8asm_program_find_label(struct moro8asm_program* program, const char* label);
-
-/**
- * Gets a label of the program.
- * @param[in] program Program
- * @param[in] index Label number
- * @return Pointer to the label or NULL.
- */
-MORO8ASM_PUBLIC(struct moro8asm_label_ref*) moro8asm_program_get_label(const struct moro8asm_program* program, size_t index);
-
-/**
- * Gets the number of labels.
- * @param[in] program Program
- * @return Number of labels.
- */
-MORO8ASM_PUBLIC(size_t) moro8asm_program_num_labels(const struct moro8asm_program* program);
-
-/**
- * Gets a line of the program.
- * @param[in] program Program
- * @param[in] index Line number
- * @return Pointer to the line or NULL.
- */
-MORO8ASM_PUBLIC(struct moro8asm_instruction*) moro8asm_program_get_line(const struct moro8asm_program* program, size_t index);
-
-/**
- * Gets the number of lines.
- * @param[in] program Program
- * @return Number of lines.
- */
-MORO8ASM_PUBLIC(size_t) moro8asm_program_num_lines(const struct moro8asm_program* program);
+MORO8ASM_PUBLIC(void) moro8asm_program_add_module(struct moro8asm_program* program, struct moro8asm_module* module);
 
 /**
  * Gets the number of bytes in the program.
@@ -424,7 +520,7 @@ MORO8ASM_PUBLIC(size_t) moro8asm_program_num_lines(const struct moro8asm_program
 MORO8ASM_PUBLIC(moro8_udword) moro8asm_program_size(const struct moro8asm_program* program);
 
 /**
- * First step: Extracts tokens from the textual representation of a program.
+ * Extracts tokens from the textual representation of a module.
  * @param[in] buf Pointer to a buffer
  * @param[in] size Buffer size
  * @return A pointer to the first token.
@@ -432,28 +528,13 @@ MORO8ASM_PUBLIC(moro8_udword) moro8asm_program_size(const struct moro8asm_progra
 MORO8ASM_PUBLIC(struct moro8asm_token*) moro8asm_tokenize(const char* buf, size_t size);
 
 /**
- * Second step: Parses from tokens to program.
- * @param[in] token Pointer to a list of tokens
- * @return Parsed program.
- */
-MORO8ASM_PUBLIC(struct moro8asm_program*) moro8asm_parse(const struct moro8asm_token* token);
-
-/**
- * Third step: Assembles a program.
+ * Assembles a program by linking the different modules.
  * @param[in] program Pointer to a program
- * @param[out] out_size Number of bytes written
- * @return Program bytes.
- */
-MORO8ASM_PUBLIC(moro8_uword*) moro8asm_assemble(const struct moro8asm_program* program, size_t* out_size);
-
-/**
- * Compiles the textual representation of a program to bytes.
  * @param[in] buf Pointer to a buffer
  * @param[in] size Buffer size
- * @param[out] Number of bytes written
- * @return Program bytes.
+ * @return Number of bytes written
  */
-MORO8ASM_PUBLIC(moro8_uword*) moro8asm_compile(const char* buf, size_t size, size_t* out_size);
+MORO8ASM_PUBLIC(moro8_udword) moro8asm_assemble(struct moro8asm_program* program, moro8_uword* buf, moro8_udword size);
 
 #ifdef __cplusplus
 }
