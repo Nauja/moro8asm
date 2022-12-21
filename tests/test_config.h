@@ -19,6 +19,9 @@ typedef struct moro8_bus moro8_bus;
 typedef struct moro8_registers moro8_registers;
 typedef struct moro8_array_memory moro8_array_memory;
 typedef struct moro8_vm moro8_vm;
+typedef struct moro8asm_token moro8asm_token;
+typedef struct moro8asm_module moro8asm_module;
+typedef enum moro8asm_tok moro8asm_tok;
 
 static void moro8_assert_output_dir(char (*buf)[LIBFS_MAX_PATH])
 {

@@ -31,36 +31,10 @@ add_dependencies(cmocka_vendor cmocka)
 message("CMOCKA_BINARY_DIR=${CMOCKA_BINARY_DIR}")
 message("CMOCKA_LIBRARY=${CMOCKA_LIBRARY}")
 
-# libfs
-set(LIBFS_SOURCE_DIR "${CMAKE_SOURCE_DIR}/vendor/libfs")
-set(LIBFS_INCLUDE_DIR "${LIBFS_SOURCE_DIR}")
-set(LIBFS_BINARY_DIR "${LIBFS_SOURCE_DIR}/build")
-
-ExternalProject_Add(libfs
-  PREFIX libfs
-  SOURCE_DIR ${LIBFS_SOURCE_DIR}
-  BINARY_DIR ${LIBFS_BINARY_DIR}
-  INSTALL_COMMAND ""
-  CMAKE_ARGS
-        -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
-        -DLIBFS_STATIC=On
-        -DLIBFS_UNIT_TESTING=Off
-        -DLIBFS_DOXYGEN=Off
-)
-
-add_library(libfs_vendor STATIC SHARED IMPORTED)
-
-if(MSVC)
-  set(LIBFS_LIBRARY "${LIBFS_BINARY_DIR}/${CMAKE_CFG_INTDIR}/libfs.lib")
-else()
-  set(LIBFS_LIBRARY "${LIBFS_BINARY_DIR}/libfs.a")
-endif()
-
-add_dependencies(libfs_vendor libfs)
-
 # moro8asm tests
 set(_TESTS
-    test_moro8asm
+    test_tokenize
+    test_modules
 )
 
 include_directories(${CMOCKA_INCLUDE_DIR}
@@ -83,10 +57,10 @@ foreach(_TEST ${_TESTS})
             ${MORO8_BINARY_DIR}
             ${LIBFS_BINARY_DIR})
 
-    # Link libfs
-    add_dependencies(moro8asm-${_TEST} libfs moro8)
+    # Link cmocka libfs and moro8
+    add_dependencies(moro8asm-${_TEST} cmocka libfs moro8)
 
 endforeach()
 
 # Copy test files
-file(COPY test_programs DESTINATION ${CMAKE_CURRENT_BINARY_DIR} FILE_PERMISSIONS OWNER_READ OWNER_WRITE)
+file(COPY test_modules DESTINATION ${CMAKE_CURRENT_BINARY_DIR} FILE_PERMISSIONS OWNER_READ OWNER_WRITE)

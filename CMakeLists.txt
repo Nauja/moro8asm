@@ -4,6 +4,8 @@ cmake_minimum_required(VERSION 3.3)
 # and find_package()
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/Modules")
 
+include(ExternalProject)
+
 set(MORO8ASM_VERSION_MAJOR 0)
 set(MORO8ASM_VERSION_MINOR 0)
 set(MORO8ASM_VERSION_PATCH 1)
@@ -45,11 +47,11 @@ endif()
 project(moro8asm VERSION ${MORO8ASM_VERSION} LANGUAGES C)
 
 include(ConfigureChecks)
-include(ExternalProject)
 
 option(MORO8ASM_STATIC "Build a static library" ON)
 option(MORO8ASM_UNIT_TESTING "Unit Tests Enabled" ON)
 option(MORO8ASM_DOXYGEN "Docs Enabled" OFF)
+option(MORO8ASM_WITH_CLI "Build the command-line interface" ON)
 
 # disallow in-source build
 include(MacroEnsureOutOfSourceBuild)
@@ -73,6 +75,7 @@ ExternalProject_Add(moro8
   CMAKE_ARGS
         -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
         -DMORO8_STATIC=On
+        -DMORO8_MINIMALIST=On
         -DMORO8_UNIT_TESTING=Off
         -DMORO8_DOXYGEN=Off
 )
@@ -126,6 +129,66 @@ if (MORO8ASM_STATIC)
                                PUBLIC
                                     ${CMAKE_CURRENT_SOURCE_DIR})
 endif()
+
+if (MORO8ASM_WITH_CLI OR MORO8ASM_UNIT_TESTING)
+# libfs
+set(LIBFS_SOURCE_DIR "${CMAKE_SOURCE_DIR}/vendor/libfs")
+set(LIBFS_INCLUDE_DIR "${LIBFS_SOURCE_DIR}")
+set(LIBFS_BINARY_DIR "${LIBFS_SOURCE_DIR}/build")
+
+ExternalProject_Add(libfs
+  PREFIX libfs
+  SOURCE_DIR ${LIBFS_SOURCE_DIR}
+  BINARY_DIR ${LIBFS_BINARY_DIR}
+  INSTALL_COMMAND ""
+  CMAKE_ARGS
+        -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+        -DLIBFS_STATIC=On
+        -DLIBFS_UNIT_TESTING=Off
+        -DLIBFS_DOXYGEN=Off
+)
+
+add_library(libfs_vendor STATIC SHARED IMPORTED)
+
+if(MSVC)
+  set(LIBFS_LIBRARY "${LIBFS_BINARY_DIR}/${CMAKE_CFG_INTDIR}/libfs.lib")
+else()
+  set(LIBFS_LIBRARY "${LIBFS_BINARY_DIR}/libfs.a")
+endif()
+
+add_dependencies(libfs_vendor libfs)
+
+message("LIBFS_BINARY_DIR=${LIBFS_BINARY_DIR}")
+message("LIBFS_LIBRARY=${LIBFS_LIBRARY}")
+endif(MORO8ASM_WITH_CLI OR MORO8ASM_UNIT_TESTING)
+
+if (MORO8ASM_WITH_CLI)
+    
+    set(MORO8ASM_CLI "moro8asm-cli")
+
+    add_executable(${MORO8ASM_CLI} "cli.c")
+            
+    target_compile_options(${MORO8ASM_CLI}
+                           PRIVATE
+                               ${DEFAULT_C_COMPILE_FLAGS}
+                               -DLIBFS_STATIC=On
+                               -DMORO8_STATIC=On)
+
+    target_link_libraries(${MORO8ASM_CLI} PRIVATE ${LIBFS_LIBRARY} ${MORO8_LIBRARY} ${MORO8_ASM_STATIC_LIB})
+
+    target_include_directories(${MORO8ASM_CLI}
+        PRIVATE 
+            ${LIBFS_INCLUDE_DIR}
+            ${LIBFS_BINARY_DIR}
+            ${MORO8_INCLUDE_DIR}
+            ${MORO8_BINARY_DIR})
+
+    # Link libfs and moro8
+    add_dependencies(${MORO8ASM_CLI} libfs moro8)
+
+    set_target_properties(${MORO8ASM_CLI} PROPERTIES RUNTIME_OUTPUT_NAME moro8asm)
+
+endif(MORO8ASM_WITH_CLI)
 
 # include cmocka
 if (MORO8ASM_UNIT_TESTING)
